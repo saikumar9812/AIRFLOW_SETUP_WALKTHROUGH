@@ -1,0 +1,181 @@
+# End-to-End ETL Project Setup & Deployment — Documentation
+
+This document outlines all the steps I followed — from local development in VS Code to deploying a fully automated ETL pipeline on Astronomer Cloud integrated with GitHub. It is meant to guide someone new through the complete process, without disclosing any project-specific details or sensitive configurations.
+
+---
+
+## 1. Initial Project Setup in VS Code
+
+### Folder Structure (Sample)
+
+```
+project_folder/
+├── dags/
+│   ├── [all Python ETL logic files go here]
+├── requirements.txt
+├── Dockerfile
+├── .astro/
+│   └── config.yaml
+```
+
+### Key Files
+
+- Main ETL runner scripts for testing locally
+- Airflow DAG for orchestration
+- Support modules for schema loading, ingestion, and credential decryption
+
+---
+
+## 2. Secure Credential Handling
+
+Store sensitive credentials securely using an encrypted method that is accessed by all your pipelines.
+
+- Ensure a decryption function exists that reads from an encrypted file instead of hardcoding secrets.
+- The encrypted file should be placed in a safe path (e.g., `/tmp/`) during deployment for permission-free read access.
+
+---
+
+## 3. Local Airflow Environment with Astronomer CLI
+
+### Step 1: Install Requirements
+
+- WSL (Ubuntu)
+- Docker Desktop (with WSL integration enabled)
+- Astro CLI
+
+```bash
+curl -sSL https://install.astronomer.io | sudo bash
+```
+
+### Step 2: Initialize Project
+
+```bash
+mkdir -p ~/airflow_project/dags
+cd ~/airflow_project
+astro dev init
+```
+
+### Step 3: Copy Files from Windows to WSL
+
+```bash
+cp /mnt/c/Users/YourName/Downloads/your_project_folder/* ~/airflow_project/dags/
+```
+
+### Step 4: Add Requirements
+
+Edit `requirements.txt`:
+
+```
+snowflake-connector-python
+pandas
+openpyxl
+odfpy
+pycryptodome
+requests
+```
+
+### Step 5: Update Dockerfile
+
+```dockerfile
+FROM quay.io/astronomer/astro-runtime:12.8.0
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+```
+
+### Step 6: Free Up Ports (If Needed)
+
+```bash
+sudo service postgresql stop
+```
+
+### Step 7: Start Airflow
+
+```bash
+astro dev restart
+```
+
+Access: http://localhost:8080 (user: admin / pass: admin)
+
+---
+
+## 4. Deployment to Astronomer Cloud
+
+### Step 1: Create Account at https://app.astronomer.io
+
+- Create workspace
+- Create a deployment (Airflow version 2.7+)
+
+### Step 2: Login via CLI
+
+```bash
+astro login
+```
+
+(Authenticate via browser popup)
+
+### Step 3: Deploy Code
+
+```bash
+astro deploy <deployment-id>
+```
+
+You will get:
+
+- Deployment URL
+- Hosted Airflow UI link
+
+### DAG now live and schedulable in Astronomer Cloud!
+
+---
+
+## 5. Optional: GitHub Integration (CI/CD Style)
+
+### Repo Structure (Minimum Required)
+
+```
+my-repo/
+├── dags/
+│   └── *.py
+├── requirements.txt
+├── Dockerfile
+├── .astro/config.yaml
+```
+
+### Connect GitHub Repo to Astronomer via UI
+
+- Go to Deployment > Settings > Git Sync
+- Connect GitHub account
+- Link to repo/branch
+- Enable Auto Deploy on Push
+
+Once enabled:
+
+- Pushing to GitHub auto-triggers build and deployment
+- Logs visible under 'Deployments > Activity Log'
+
+---
+
+## Common Errors & Fixes
+
+| Error                               | Fix                                                         |
+| ----------------------------------- | ----------------------------------------------------------- |
+| `port 5432 already in use`          | Stop system PostgreSQL / use 5433                           |
+| `ModuleNotFoundError`               | Add to `requirements.txt` & rebuild                         |
+| `PermissionError writing .sql/.csv` | Write to `/tmp/` instead of `/dags/`                        |
+| DAG not showing                     | Check if it is in `dags/` and no import errors              |
+| Auto deploy fails                   | Ensure repo has `.astro/config.yaml`, `Dockerfile`, `dags/` |
+
+---
+
+## Conclusion
+
+You now have:
+
+- Secure credential management
+- Modular Python ETL pipelines
+- Fully tested local DAGs
+- Deployed on Astronomer Cloud
+- Optionally GitHub-connected for CI/CD
+
+From VS Code to production-grade orchestration — all containerized, versioned, and automated.
+
